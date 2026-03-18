@@ -1,0 +1,6 @@
+qiskit>=1.0
+qiskit-aer
+streamlit>=1.30
+matplotlib
+numpy
+plotly
