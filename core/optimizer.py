@@ -132,7 +132,7 @@ def _build_pass_manager(strategy: str) -> PassManager:
     if strategy in ("Light", "Medium", "Heavy"):
         passes.extend([
             Optimize1qGatesDecomposition(),
-            CXCancellation(),
+            CommutativeCancellation(),  # replaced CXCancellation
         ])
 
     if strategy in ("Medium", "Heavy"):
@@ -147,7 +147,7 @@ def _build_pass_manager(strategy: str) -> PassManager:
             Collect2qBlocks(),
             ConsolidateBlocks(),
             Optimize1qGatesDecomposition(),
-            CXCancellation(),
+            CommutativeCancellation(),  # replaced CXCancellation
         ])
 
     return PassManager(passes)
