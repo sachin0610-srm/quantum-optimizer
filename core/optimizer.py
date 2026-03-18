@@ -8,14 +8,12 @@ from qiskit.transpiler import PassManager
 from qiskit.transpiler.passes import (
     Optimize1qGates,
     Optimize1qGatesDecomposition,
-    CXCancellation,
     CommutativeCancellation,
     RemoveDiagonalGatesBeforeMeasure,
     RemoveResetInZeroState,
     Collect2qBlocks,
     ConsolidateBlocks,
 )
-
 
 @dataclass
 class CircuitMetrics:
