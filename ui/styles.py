@@ -264,5 +264,20 @@ header    { visibility: hidden; }
 .animate-in {
     animation: fadeInUp 0.5s ease-out forwards;
 }
+/* ── Force sidebar always visible ───────────────────────────────── */
+[data-testid="stSidebar"] {
+    display: block !important;
+    visibility: visible !important;
+    transform: none !important;
+    min-width: 280px !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+}
+
+section[data-testid="stSidebar"] > div {
+    width: 280px !important;
+}
 </style>
 """
