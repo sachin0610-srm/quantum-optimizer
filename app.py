@@ -143,11 +143,11 @@ def main():
     # Side-by-side comparison
     render_comparison(result)
 
+    # Explanation (REASON) — directly below the circuit comparison
+    render_explanation(result.explanation)
+
     # Charts
     render_improvement_charts(result)
-
-    # Explanation
-    render_explanation(result.explanation)
 
     # ── Noise simulation ─────────────────────────────────────────────
     if cfg["enable_noise"]:

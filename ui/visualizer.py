@@ -392,12 +392,19 @@ def render_hardware_results(hw_result: HardwareResult):
 # ── Explanation panel ────────────────────────────────────────────────
 
 def render_explanation(explanation: str):
-    """Render the optimization explanation."""
+    """Render the optimization explanation with premium educational UI."""
     st.markdown(
-        '<div class="section-header"><h3>📖 Optimization Explanation</h3></div>',
+        '<div class="section-header"><h3>📖 Optimization Reasoning</h3></div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        f'<div class="info-card">{explanation}</div>',
+        '<div style="font-size:0.9rem;color:#8B949E;margin-bottom:1rem;">'
+        'Detailed breakdown of what was optimized, which transpiler passes were used, '
+        'and the mathematical principles behind each transformation.'
+        '</div>',
         unsafe_allow_html=True,
     )
+
+    # Use Streamlit's native markdown rendering for proper formatting
+    st.markdown(explanation)
+

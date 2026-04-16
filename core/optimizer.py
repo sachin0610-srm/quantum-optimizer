@@ -154,8 +154,12 @@ def _build_pass_manager(strategy: str) -> PassManager:
 
 
 def _build_explanation(strategy: str, orig: CircuitMetrics, opt: CircuitMetrics) -> str:
-    """Generate a human-readable explanation of what the optimization did."""
-    lines = [f"### Optimization Strategy: **{strategy}**\n"]
+    """Generate a detailed, educational explanation of what the optimization did."""
+
+    sections = []
+
+    # ── Section 1: Strategy Overview ─────────────────────────────────
+    sections.append(f"### 🎯 Optimization Strategy: **{strategy}**\n")
 
     strategy_descriptions = {
         "Light": (
@@ -181,35 +185,177 @@ def _build_explanation(strategy: str, orig: CircuitMetrics, opt: CircuitMetrics)
             "gate direction optimization, and aggressive resynthesis."
         ),
     }
-    lines.append(strategy_descriptions.get(strategy, ""))
-    lines.append("")
+    sections.append(strategy_descriptions.get(strategy, ""))
 
-    # Results summary
+    # ── Section 2: Qiskit Transpiler Passes Applied ──────────────────
+    sections.append("\n### 🔧 Transpiler Passes Applied\n")
+
+    pass_details = {
+        "Light": [
+            ("**Optimize1qGatesDecomposition**", "Merges consecutive single-qubit "
+             "gates (e.g., Rz·Ry·Rz) into a single U gate. "
+             "Mathematically, any sequence of single-qubit rotations can be "
+             "composed into one unitary: U = Rz(γ)·Ry(β)·Rz(α)."),
+            ("**CommutativeCancellation**", "Identifies gates that commute "
+             "(AB = BA) and reorders them to expose cancellation pairs. "
+             "For example, two adjacent CX gates on the same qubits cancel: "
+             "CX · CX = I (identity)."),
+        ],
+        "Medium": [
+            ("**Optimize1qGatesDecomposition**", "Merges consecutive single-qubit "
+             "gates into a single U gate using Euler decomposition."),
+            ("**CommutativeCancellation**", "Reorders commuting gates to reveal "
+             "cancellation opportunities (e.g., CX·CX = I)."),
+            ("**RemoveDiagonalGatesBeforeMeasure**", "Removes Z, S, T, Rz gates "
+             "that appear immediately before a measurement. These gates only "
+             "change the global/relative phase, which is destroyed by the "
+             "projective measurement — so they have no observable effect."),
+            ("**RemoveResetInZeroState**", "Removes reset operations on qubits "
+             "that are already in the |0⟩ state at the start of the circuit, "
+             "since resetting |0⟩ to |0⟩ is a no-op."),
+        ],
+        "Heavy": [
+            ("**Optimize1qGatesDecomposition**", "Euler decomposition of single-qubit gate chains."),
+            ("**CommutativeCancellation**", "Reorder + cancel commuting gate pairs."),
+            ("**RemoveDiagonalGatesBeforeMeasure**", "Strip phase-only gates before measurements."),
+            ("**RemoveResetInZeroState**", "Remove redundant resets on |0⟩ qubits."),
+            ("**Collect2qBlocks**", "Scans the circuit DAG to identify maximal "
+             "blocks of consecutive 2-qubit gates that act on the same pair of qubits."),
+            ("**ConsolidateBlocks**", "Takes each 2-qubit block, computes its "
+             "total 4×4 unitary matrix, and re-synthesizes it using the KAK "
+             "decomposition — which guarantees at most 3 CX gates for any "
+             "2-qubit unitary. This is the most powerful pass and can "
+             "dramatically reduce CX count."),
+        ],
+        "Full": [
+            ("**All of the above** + Qiskit Level-3 passes", "Includes "
+             "layout-aware qubit mapping, SWAP routing, gate direction "
+             "correction, and aggressive unitary resynthesis across the "
+             "entire circuit."),
+        ],
+    }
+
+    for pass_name, desc in pass_details.get(strategy, []):
+        sections.append(f"- {pass_name}: {desc}")
+
+    # ── Section 3: Results Summary ───────────────────────────────────
+    sections.append("\n### 📊 What Changed\n")
+
     depth_change = orig.depth - opt.depth
     gate_change  = orig.gate_count - opt.gate_count
     cx_change    = orig.cx_count - opt.cx_count
+    sq_change    = orig.single_qubit_gates - opt.single_qubit_gates
+    tq_change    = orig.two_qubit_gates - opt.two_qubit_gates
 
     if depth_change > 0:
-        lines.append(f"- **Circuit depth** reduced by {depth_change} "
-                      f"({orig.depth} → {opt.depth})")
+        sections.append(f"- **Circuit depth** reduced by {depth_change} "
+                        f"({orig.depth} → {opt.depth})")
     elif depth_change < 0:
-        lines.append(f"- ⚠️ **Circuit depth** increased by {abs(depth_change)} "
-                      f"({orig.depth} → {opt.depth}) — "
-                      "this can happen when resynthesis trades depth for gate count")
+        sections.append(f"- ⚠️ **Circuit depth** increased by {abs(depth_change)} "
+                        f"({orig.depth} → {opt.depth}) — "
+                        "this can happen when resynthesis trades depth for gate count")
     else:
-        lines.append(f"- Circuit depth unchanged at {orig.depth}")
+        sections.append(f"- Circuit depth unchanged at {orig.depth}")
 
     if gate_change > 0:
-        lines.append(f"- **Total gates** reduced by {gate_change} "
-                      f"({orig.gate_count} → {opt.gate_count})")
+        sections.append(f"- **Total gates** reduced by {gate_change} "
+                        f"({orig.gate_count} → {opt.gate_count})")
     elif gate_change < 0:
-        lines.append(f"- Total gates increased by {abs(gate_change)} "
-                      f"({orig.gate_count} → {opt.gate_count})")
+        sections.append(f"- Total gates increased by {abs(gate_change)} "
+                        f"({orig.gate_count} → {opt.gate_count})")
     else:
-        lines.append(f"- Total gates unchanged at {orig.gate_count}")
+        sections.append(f"- Total gates unchanged at {orig.gate_count}")
 
     if cx_change > 0:
-        lines.append(f"- **CX gates** (most expensive) reduced by {cx_change} "
-                      f"({orig.cx_count} → {opt.cx_count})")
+        sections.append(f"- **CX gates** (most expensive) reduced by {cx_change} "
+                        f"({orig.cx_count} → {opt.cx_count})")
+    elif cx_change == 0 and orig.cx_count > 0:
+        sections.append(f"- CX gates unchanged at {orig.cx_count}")
 
-    return "\n".join(lines)
+    if sq_change > 0:
+        sections.append(f"- **Single-qubit gates** reduced by {sq_change} "
+                        f"({orig.single_qubit_gates} → {opt.single_qubit_gates})")
+    if tq_change > 0:
+        sections.append(f"- **Two-qubit gates** reduced by {tq_change} "
+                        f"({orig.two_qubit_gates} → {opt.two_qubit_gates})")
+
+    # ── Section 4: Gate-by-gate diff ─────────────────────────────────
+    gate_diff = _gate_level_diff(orig.operations, opt.operations)
+    if gate_diff:
+        sections.append("\n### 🔬 Gate-by-Gate Breakdown\n")
+        sections.append("| Gate | Original | Optimized | Change |")
+        sections.append("|------|----------|-----------|--------|")
+        for row in gate_diff:
+            sections.append(row)
+
+    # ── Section 5: Educational Notes ─────────────────────────────────
+    sections.append("\n### 🎓 Why This Works (Educational Notes)\n")
+
+    edu_notes = []
+
+    if sq_change > 0:
+        edu_notes.append(
+            "**Single-Qubit Merging:** Any sequence of single-qubit gates on the same qubit "
+            "can be combined into one gate. This is because single-qubit gates are 2×2 unitary "
+            "matrices, and the product of unitaries is still unitary. For example, "
+            "Rz(θ₁)·Ry(θ₂)·Rz(θ₃) can be represented as a single U(θ,φ,λ) gate with "
+            "equivalent action — this is the ZYZ Euler decomposition."
+        )
+
+    if cx_change > 0:
+        edu_notes.append(
+            "**CX Cancellation:** Two consecutive CNOT (CX) gates on the same control-target "
+            "pair cancel perfectly: CX · CX = I. This is because CX is its own inverse "
+            "(it is a self-inverse or involutory gate). The optimizer detects these patterns "
+            "even when other commuting gates are interleaved between them."
+        )
+
+    if strategy in ("Medium", "Heavy", "Full"):
+        edu_notes.append(
+            "**Diagonal Gate Removal:** Gates like Z, S, T, and Rz are diagonal in the "
+            "computational basis — they only add phase to |1⟩ and leave |0⟩ unchanged. "
+            "Since measurement in the computational basis only distinguishes |0⟩ from |1⟩ "
+            "(discarding phase information), any diagonal gate right before measurement "
+            "has zero effect on the measurement outcome and can be safely removed."
+        )
+
+    if strategy in ("Heavy", "Full"):
+        edu_notes.append(
+            "**KAK Decomposition (Block Consolidation):** Any 2-qubit unitary (a 4×4 matrix) "
+            "can be decomposed into at most 3 CNOT gates plus single-qubit rotations. "
+            "This is the Cartan/KAK decomposition. When the optimizer finds a long sequence "
+            "of interleaved CX and single-qubit gates on two qubits, it multiplies all the "
+            "matrices together into one 4×4 unitary, then re-synthesizes it — often using "
+            "fewer CX gates than the original."
+        )
+
+    if not edu_notes:
+        edu_notes.append(
+            "The circuit was already fairly optimal. The optimizer verified that no "
+            "significant simplifications were possible with the selected strategy."
+        )
+
+    for note in edu_notes:
+        sections.append(f"- {note}\n")
+
+    return "\n".join(sections)
+
+
+def _gate_level_diff(orig_ops: dict, opt_ops: dict) -> list[str]:
+    """Produce a markdown table of per-gate changes, excluding barriers/measures."""
+    all_gates = sorted(set(orig_ops) | set(opt_ops))
+    rows = []
+    for gate in all_gates:
+        if gate in ("barrier", "measure"):
+            continue
+        o = orig_ops.get(gate, 0)
+        n = opt_ops.get(gate, 0)
+        diff = o - n
+        if diff > 0:
+            change = f"🟢 −{diff}"
+        elif diff < 0:
+            change = f"🔴 +{abs(diff)}"
+        else:
+            change = "—"
+        rows.append(f"| `{gate}` | {o} | {n} | {change} |")
+    return rows
