@@ -136,24 +136,35 @@ def _random_4() -> QuantumCircuit:
 
 def _teleportation_3() -> QuantumCircuit:
     """Quantum teleportation protocol."""
-    qc = QuantumCircuit(3, 3, name="Teleportation")
+    from qiskit.circuit import ClassicalRegister, QuantumRegister
+
+    qr = QuantumRegister(3, "q")
+    cr = ClassicalRegister(3, "c")
+    qc = QuantumCircuit(qr, cr, name="Teleportation")
+
     # Prepare state to teleport
-    qc.rx(np.pi / 4, 0)
+    qc.rx(np.pi / 4, qr[0])
     qc.barrier()
+
     # Create Bell pair
-    qc.h(1)
-    qc.cx(1, 2)
+    qc.h(qr[1])
+    qc.cx(qr[1], qr[2])
     qc.barrier()
+
     # Bell measurement
-    qc.cx(0, 1)
-    qc.h(0)
+    qc.cx(qr[0], qr[1])
+    qc.h(qr[0])
     qc.barrier()
-    qc.measure(0, 0)
-    qc.measure(1, 1)
-    # Corrections
-    qc.x(2).c_if(1, 1)
-    qc.z(2).c_if(0, 1)
-    qc.measure(2, 2)
+    qc.measure(qr[0], cr[0])
+    qc.measure(qr[1], cr[1])
+
+    # Corrections using Qiskit 1.0+ if_test context manager
+    with qc.if_test((cr[1], 1)):
+        qc.x(qr[2])
+    with qc.if_test((cr[0], 1)):
+        qc.z(qr[2])
+
+    qc.measure(qr[2], cr[2])
     return qc
 
 
